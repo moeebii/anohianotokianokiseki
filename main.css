@@ -1,22 +1,11 @@
-body {
-  font-family: Arial, sans-serif;
-  text-align: center;
-  margin: 0;
-  padding: 0;
-  background-color: #f4f4f9;
-  color: #333;
-}
-
-.text-display {
-  font-size: 2rem;
-  margin-top: 50px;
-  padding: 20px;
-  background-color: #ffffff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  display: inline-block;
-}
-
-canvas {
+/* Example CSS (can be adjusted as per your design needs) */
+#video {
   display: none;
+}
+
+/* Style for the text element */
+.text-display {
+  font-size: 24px;
+  text-align: center;
+  margin-top: 20%;
 }

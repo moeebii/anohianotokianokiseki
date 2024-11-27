@@ -1,66 +1,78 @@
-// Ensure face-api.js is loaded and initialized before using it
-window.onload = () => {
-    // Reference to the video element
-    const video = document.getElementById('video');
-    
-    // Set up the camera and start the video stream
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+const video = document.getElementById('video');
+const textElement = document.getElementById('text');
+const texts = ["text 1", "text 2", "text 3", "text 4"];
+let currentTextIndex = 0;
+let blinkTimeout;
+
+async function startVideo() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
         video.srcObject = stream;
-      } catch (error) {
-        console.error("Error accessing the camera: ", error);
-      }
-    }
-  
-    // Call the blink detection function periodically
-    let blinkTimeout;
-    function detectBlink() {
-      // Ensure face-api.js is loaded
-      if (typeof faceapi === 'undefined') {
-        console.log("face-api.js is not loaded yet");
-        return;
-      }
-  
-      // Detect faces using face-api.js
-      faceapi.detectAllFaces(video)
-        .withFaceLandmarks()
-        .withFaceDescriptors()
-        .then((detections) => {
-          if (detections.length > 0) {
-            // Assuming first face is the main one
-            const face = detections[0];
-            const { leftEye, rightEye } = face.landmarks;
-  
-            // Check if the eyes are closed (this is an approximation)
-            const leftEyeClosed = leftEye[1].y - leftEye[2].y < 10; // Arbitrary value for detecting closed eye
-            const rightEyeClosed = rightEye[1].y - rightEye[2].y < 10; // Arbitrary value for detecting closed eye
-  
-            if (leftEyeClosed && rightEyeClosed) {
-              // If both eyes are closed, trigger blink action
-              changeText();
-            }
-          }
-        })
-        .catch((err) => {
-          console.error("Face detection failed:", err);
+        video.addEventListener('loadeddata', () => {
+            onPlay();
         });
+    } catch (error) {
+        console.log("Error accessing the webcam:", error);
     }
-  
-    // Function to change text when blink is detected
-    function changeText() {
-      const textElement = document.getElementById('displayText');
-      textElement.innerText = "Blink detected!";
-  
-      // Reset text after 2 seconds
-      clearTimeout(blinkTimeout);
-      blinkTimeout = setTimeout(() => {
-        textElement.innerText = "Welcome!";
-      }, 2000);
+}
+
+async function loadModels() {
+    await faceapi.nets.tinyFaceDetector.loadFromUri('/models/tiny_face_detector');
+    await faceapi.nets.faceLandmark68Net.loadFromUri('/models/face_landmark_68');
+}
+
+function changeText() {
+    currentTextIndex = (currentTextIndex + 1) % texts.length;
+    textElement.innerText = texts[currentTextIndex];
+}
+
+function isBlink(landmarks) {
+    const leftEye = landmarks.getLeftEye();
+    const rightEye = landmarks.getRightEye();
+
+    const leftEAR = calculateEAR(leftEye);
+    const rightEAR = calculateEAR(rightEye);
+
+    const earAvg = (leftEAR + rightEAR) / 2;
+
+    return leftEAR < 0.285 && rightEAR < 0.31;
+}
+
+function calculateDistance(point1, point2) {
+    return Math.sqrt(Math.pow(point1.x - point2.x, 2) + Math.pow(point1.y - point2.y, 2));
+}
+
+function calculateEAR(eye) {
+    const vertical1 = calculateDistance(eye[1], eye[5]);
+    const vertical2 = calculateDistance(eye[2], eye[4]);
+    const horizontal = calculateDistance(eye[0], eye[3]);
+
+    return (vertical1 + vertical2) / (2.0 * horizontal);
+}
+
+async function onPlay() {
+    const options = new faceapi.TinyFaceDetectorOptions();
+
+    const result = await faceapi.detectSingleFace(video, options).withFaceLandmarks();
+
+    if (result) {
+        const landmarks = result.landmarks;
+        if (isBlink(landmarks)) {
+            if (blinkTimeout) clearTimeout(blinkTimeout);
+            blinkTimeout = setTimeout(() => {
+                changeText();
+            }, 300);
+        }
     }
-  
-    // Start the camera and detect blink periodically
-    startCamera();
-    setInterval(detectBlink, 100);  // Run blink detection every 100ms
-  };
-  
+
+    requestAnimationFrame(onPlay);
+}
+
+video.addEventListener('play', () => {
+    onPlay();
+});
+
+(async function init() {
+    await loadModels();
+    await startVideo();
+})();
